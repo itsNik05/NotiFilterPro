@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.notifilterpro.ui.categorizer.AppCategorizerScreen
 import com.example.notifilterpro.ui.inbox.BlockedHistoryScreen
 import com.example.notifilterpro.ui.inbox.InboxScreen
+import com.example.notifilterpro.ui.inbox.InboxViewModel
 import com.example.notifilterpro.ui.rules.RulesHubScreen
 import com.example.notifilterpro.ui.rules.RulesManagerScreen
 import com.example.notifilterpro.ui.rules.SenderRulesScreen
@@ -35,11 +37,14 @@ import com.example.notifilterpro.ui.rules.TimeProfilesScreen
 import com.example.notifilterpro.ui.settings.SettingsScreen
 
 @Composable
-fun MainScreen() {
+fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val isDark = isSystemInDarkTheme() // You can tie this to your ViewModel if you want manual toggling globally
+
+    // FIX 1: Listen to the shared ViewModel so the background updates instantly
+    val isDarkMode by themeViewModel.isDarkMode.collectAsState()
+    val isDark = isDarkMode ?: isSystemInDarkTheme()
 
     val bgColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFF3F4F6)
     val navColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFFFFFFF)
@@ -66,8 +71,9 @@ fun MainScreen() {
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CustomBottomNavItem("Home", Icons.Default.Dashboard, currentRoute == "inbox", isDark) { navigateToTab("inbox") }
-                    CustomBottomNavItem("Rules", Icons.Default.FilterAlt, currentRoute?.startsWith("rules") == true, isDark) { navigateToTab("rules_hub") }
+                    CustomBottomNavItem("Home", Icons.Default.Dashboard, currentRoute == "inbox" || currentRoute == "blocked_history", isDark) { navigateToTab("inbox") }
+                    // FIX 2: Use .contains("rules") so sub-menus keep the tab highlighted
+                    CustomBottomNavItem("Rules", Icons.Default.FilterAlt, currentRoute?.contains("rules") == true, isDark) { navigateToTab("rules_hub") }
                     CustomBottomNavItem("Apps", Icons.Default.Smartphone, currentRoute == "app_rules", isDark) { navigateToTab("app_rules") }
                     CustomBottomNavItem("Settings", Icons.Default.Settings, currentRoute == "settings", isDark) { navigateToTab("settings") }
                 }
@@ -83,7 +89,9 @@ fun MainScreen() {
                 RulesHubScreen(
                     onNavigateToKeywords = { navController.navigate("rules_keywords") },
                     onNavigateToSender = { navController.navigate("rules_sender") },
-                    onNavigateToTime = { navController.navigate("rules_time") }
+                    onNavigateToTime = { navController.navigate("rules_time") },
+                    // FIX 3: Passed the navigation action so the Blocked button works on the Rules page
+                    onNavigateToBlocked = { navController.navigate("blocked_history") }
                 )
             }
             composable("rules_keywords") { RulesManagerScreen() }

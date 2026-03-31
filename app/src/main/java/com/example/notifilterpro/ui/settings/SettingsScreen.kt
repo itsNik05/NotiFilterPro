@@ -169,10 +169,10 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FrequencyChip("24h", currentThreshold == 24L, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(24L) }
-                        FrequencyChip("48h", currentThreshold == 48L, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(48L) }
-                        FrequencyChip("7 Days", currentThreshold == 168L, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(168L) }
-                        FrequencyChip("Forever", currentThreshold == -1L, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(-1L) }
+                        FrequencyChip("24h", currentThreshold == 24, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(24) }
+                        FrequencyChip("48h", currentThreshold == 48, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(48) }
+                        FrequencyChip("7 Days", currentThreshold == 168, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(168) }
+                        FrequencyChip("Forever", currentThreshold == -1, cyanAccent, isDark) { viewModel.updateAutoDeleteThreshold(-1) }
                     }
                 }
             }

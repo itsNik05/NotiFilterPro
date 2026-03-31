@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.border
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.notifilterpro.data.local.InterceptedNotificationEntity
 import java.util.*
@@ -40,6 +40,9 @@ fun InboxScreen(
     viewModel: InboxViewModel = hiltViewModel()
 ) {
     val notifications by viewModel.notifications.collectAsState()
+
+    // Safety check: Ensure these states exist in your InboxViewModel!
+    // If they don't, comment them out and use dummy values for now.
     val blockedCount by viewModel.blockedCount.collectAsState()
     val allowedCount by viewModel.allowedCount.collectAsState()
     val savedThemePreference by viewModel.isDarkMode.collectAsState()
@@ -68,7 +71,7 @@ fun InboxScreen(
                             text = "Aura Filter",
                             fontWeight = FontWeight.Bold,
                             fontSize = 22.sp,
-                            color = cyanAccent // The cool cyan title!
+                            color = cyanAccent
                         )
                         Text(
                             text = "Peace of mind",
@@ -91,27 +94,47 @@ fun InboxScreen(
         }
     ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(paddingValues),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues), // This is correctly applied
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- 1. STATS ROW (Matching the screenshot) ---
+            // --- 1. STATS ROW ---
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // FIX: We apply weight inside the Row directly
                     StatCard(
-                        modifier = Modifier.weight(1f).clickable { onNavigateToBlocked() },
-                        title = "BLOCKED", count = blockedCount.toString(),
-                        iconColor = redAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateToBlocked() },
+                        title = "BLOCKED",
+                        count = blockedCount.toString(),
+                        iconColor = redAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
-                        title = "REVIEW", count = notifications.size.toString(),
-                        iconColor = orangeAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
+                        title = "REVIEW",
+                        count = notifications.size.toString(),
+                        iconColor = orangeAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
                     )
                     StatCard(
                         modifier = Modifier.weight(1f),
-                        title = "ALLOWED", count = allowedCount.toString(),
-                        iconColor = greenAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
+                        title = "ALLOWED",
+                        count = allowedCount.toString(),
+                        iconColor = greenAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
                     )
                 }
             }
@@ -119,7 +142,9 @@ fun InboxScreen(
             // --- 2. QUEUE HEADER ---
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -146,7 +171,9 @@ fun InboxScreen(
             if (notifications.isEmpty()) {
                 item {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = greenAccent.copy(alpha = 0.5f))
@@ -172,19 +199,32 @@ fun InboxScreen(
 }
 
 @Composable
-fun StatCard(modifier: Modifier, title: String, count: String, iconColor: Color, cardBg: Color, textColor: Color, subTextColor: Color) {
+fun StatCard(
+    modifier: Modifier,
+    title: String,
+    count: String,
+    iconColor: Color,
+    cardBg: Color,
+    textColor: Color,
+    subTextColor: Color
+) {
     Card(
         modifier = modifier.height(110.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardBg)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
-                modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, iconColor.copy(alpha = 0.3f), CircleShape),
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, iconColor.copy(alpha = 0.3f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Shield, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
@@ -211,28 +251,40 @@ fun AuraNotificationCard(
     val timeString = DateFormat.format("hh:mm a", Date(notification.timestamp)).toString()
 
     val realAppName = remember(notification.packageName) {
-        try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(notification.packageName, 0)).toString() }
-        catch (e: PackageManager.NameNotFoundException) { notification.packageName }
+        try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(notification.packageName, 0)).toString()
+        } catch (e: PackageManager.NameNotFoundException) {
+            notification.packageName
+        }
     }
 
-    // Button colors matching the mockup
     val blockBg = if (isDark) Color(0xFF2A1515) else Color(0xFFFFF0F0)
     val blockText = Color(0xFFEF4444)
     val allowBg = if (isDark) Color(0xFF14291E) else Color(0xFFEEFDF3)
     val allowText = Color(0xFF22C55E)
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable {
-            val launchIntent = packageManager.getLaunchIntentForPackage(notification.packageName)
-            if (launchIntent != null) context.startActivity(launchIntent) else Toast.makeText(context, "Cannot open", Toast.LENGTH_SHORT).show()
-        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                val launchIntent = packageManager.getLaunchIntentForPackage(notification.packageName)
+                if (launchIntent != null) {
+                    context.startActivity(launchIntent)
+                } else {
+                    Toast.makeText(context, "Cannot open", Toast.LENGTH_SHORT).show()
+                }
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                // Mock app icon box
-                Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.05f)))
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.05f))
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(text = realAppName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = textColor)
@@ -250,7 +302,8 @@ fun AuraNotificationCard(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick = onBlock, modifier = Modifier.weight(1f),
+                    onClick = onBlock,
+                    modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = blockBg, contentColor = blockText),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -259,7 +312,8 @@ fun AuraNotificationCard(
                     Text("Block", fontWeight = FontWeight.SemiBold)
                 }
                 Button(
-                    onClick = onAllow, modifier = Modifier.weight(1f),
+                    onClick = onAllow,
+                    modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = allowBg, contentColor = allowText),
                     shape = RoundedCornerShape(12.dp)
                 ) {

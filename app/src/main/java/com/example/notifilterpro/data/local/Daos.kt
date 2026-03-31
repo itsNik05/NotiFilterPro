@@ -72,6 +72,9 @@ interface KeywordDao {
 
     @Query("SELECT * FROM smart_keywords WHERE isWhitelist = 0")
     fun getBlacklist(): kotlinx.coroutines.flow.Flow<List<KeywordEntity>>
+
+    @Query("DELETE FROM smart_keywords WHERE keyword = :word AND isWhitelist = :isWhitelist")
+    suspend fun deleteKeywordByValue(word: String, isWhitelist: Boolean)
 }
 
 // --- SENDER RULES DAO ---
