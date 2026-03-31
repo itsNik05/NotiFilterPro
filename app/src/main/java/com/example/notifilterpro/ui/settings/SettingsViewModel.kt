@@ -27,15 +27,12 @@ class SettingsViewModel @Inject constructor(
 
     private val prefs = context.getSharedPreferences("noti_prefs", Context.MODE_PRIVATE)
 
-    // --- 0. AUTO-DELETE THRESHOLD (This fixes the red errors in SettingsScreen!) ---
-    // Reads the saved value, defaulting to 24 hours if it hasn't been set yet
+    // --- 0. AUTO-DELETE THRESHOLD ---
     private val _autoDeleteThreshold = MutableStateFlow(prefs.getInt("auto_delete_threshold", 24))
     val autoDeleteThreshold: StateFlow<Int> = _autoDeleteThreshold.asStateFlow()
 
     fun updateAutoDeleteThreshold(newThreshold: Int) {
-        // Updates the UI state
         _autoDeleteThreshold.value = newThreshold
-        // Saves it so the app remembers next time you open it
         prefs.edit().putInt("auto_delete_threshold", newThreshold).apply()
     }
 
@@ -53,13 +50,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // --- 2. MASTER TOGGLE LOGIC ---
-    private val _isPaused = MutableStateFlow(prefs.getBoolean("is_paused", false))
-    val isPaused = _isPaused.asStateFlow()
+    // --- 2. MASTER TOGGLE LOGIC (Fixed to use isActive) ---
+    private val _isActive = MutableStateFlow(prefs.getBoolean("is_active", true))
+    val isActive = _isActive.asStateFlow()
 
-    fun toggleService(paused: Boolean) {
-        prefs.edit().putBoolean("is_paused", paused).apply()
-        _isPaused.value = paused
+    fun toggleService(active: Boolean) {
+        // .commit() saves instantly so the FilterService reads it immediately
+        prefs.edit().putBoolean("is_active", active).commit()
+        _isActive.value = active
     }
 
     // --- 3. CLEAR DATA LOGIC ---

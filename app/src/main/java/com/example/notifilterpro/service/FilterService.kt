@@ -3,6 +3,7 @@ package com.example.notifilterpro.service
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.example.notifilterpro.data.local.*
 import com.example.notifilterpro.data.preferences.SettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -19,7 +20,7 @@ class FilterService : NotificationListenerService() {
     @Inject lateinit var blockedNotificationDao: BlockedNotificationDao
     @Inject lateinit var senderRuleDao: SenderRuleDao
     @Inject lateinit var timeProfileDao: TimeProfileDao
-    @Inject lateinit var settingsRepository: SettingsRepository // <-- ADDED BACK: The Stats Tracker
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -31,6 +32,7 @@ class FilterService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d("AuraFilter", "🟢 FilterService Created & Booting Up!")
         serviceScope.launch { keywordDao.getWhitelist().collect { entities -> activeWhitelist = entities.map { it.keyword } } }
         serviceScope.launch { keywordDao.getBlacklist().collect { entities -> activeBlacklist = entities.map { it.keyword } } }
         serviceScope.launch { senderRuleDao.getWhitelistSenders().collect { entities -> activeVipSenders = entities.map { it.senderName } } }
@@ -40,6 +42,7 @@ class FilterService : NotificationListenerService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d("AuraFilter", "🔴 FilterService Destroyed by Android!")
         serviceScope.cancel()
     }
 
@@ -62,75 +65,82 @@ class FilterService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
-        // Safety guard: Don't let the app intercept its own alerts
-        if (sbn.packageName == packageName) return
+        val pkgName = sbn.packageName
+        Log.d("AuraFilter", "🔔 Notification Detected from: $pkgName")
+
+        if (pkgName == packageName) {
+            Log.d("AuraFilter", "🚫 Ignored: Came from our own app")
+            return
+        }
 
         val prefs = applicationContext.getSharedPreferences("noti_prefs", android.content.Context.MODE_PRIVATE)
-        if (prefs.getBoolean("is_paused", false)) return
 
-        val packageName = sbn.packageName
+        // If is_active is FALSE, we return and ignore the notification
+        if (!prefs.getBoolean("is_active", true)) {
+            Log.d("AuraFilter", "⏸️ Ignored: Filtering is PAUSED in settings")
+            return
+        }
 
-        // Using getCharSequence to prevent silent crashes if an app sends colored/bolded text
         val title = sbn.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "No Title"
         val text = sbn.notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+
+        Log.d("AuraFilter", "📝 Title: $title | Text: $text")
 
         val lowerTitle = title.lowercase()
         val fullContent = "$title $text".lowercase()
 
         serviceScope.launch {
             try {
-                val hasPriorityKeyword = activeWhitelist.any { fullContent.contains(it) }
-                val hasSpamKeyword = activeBlacklist.any { fullContent.contains(it) }
-                val isVipSender = activeVipSenders.any { lowerTitle.contains(it) }
-                val isBlockedSender = activeBlockedSenders.any { lowerTitle.contains(it) }
+                val hasPriorityKeyword = activeWhitelist.any { fullContent.contains(it.lowercase()) }
+                val hasSpamKeyword = activeBlacklist.any { fullContent.contains(it.lowercase()) }
+                val isVipSender = activeVipSenders.any { lowerTitle.contains(it.lowercase()) }
+                val isBlockedSender = activeBlockedSenders.any { lowerTitle.contains(it.lowercase()) }
 
-                val rule = appRuleDao.getRuleForApp(packageName)
-                val category = rule?.category ?: "GREEN"
+                val rule = appRuleDao.getRuleForApp(pkgName)
+                val category = rule?.category ?: "ORANGE"
 
-                // 1. VIPs and Priority
+                Log.d("AuraFilter", "⚙️ App Category is: $category")
+
                 if (hasPriorityKeyword || isVipSender) {
-                    settingsRepository.incrementAllowedCount() // <-- ADDED: +1 Allowed
+                    Log.d("AuraFilter", "✅ Allowed: VIP or Priority Keyword matched")
+                    settingsRepository.incrementAllowedCount()
                     return@launch
                 }
 
-                // 2. Spam and Blocked Senders
                 if (hasSpamKeyword || isBlockedSender) {
+                    Log.d("AuraFilter", "🛑 Blocked: Spam or Blocked Sender matched")
                     cancelNotification(sbn.key)
-                    blockedNotificationDao.insertBlockedNotification(
-                        BlockedNotificationEntity(packageName = packageName, title = title, content = text, timestamp = System.currentTimeMillis())
-                    )
-                    settingsRepository.incrementBlockedCount() // <-- ADDED: +1 Blocked
+                    blockedNotificationDao.insertBlockedNotification(BlockedNotificationEntity(packageName = pkgName, title = title, content = text, timestamp = System.currentTimeMillis()))
+                    settingsRepository.incrementBlockedCount()
                     return@launch
                 }
 
-                // 3. Time Profile Check
                 if (!isCurrentlyInFocusMode()) {
-                    settingsRepository.incrementAllowedCount() // <-- ADDED: +1 Allowed
+                    Log.d("AuraFilter", "✅ Allowed: Not currently in Focus Mode")
+                    settingsRepository.incrementAllowedCount()
                     return@launch
                 }
 
-                // 4. App Rules Check
                 if (category == "RED") {
+                    Log.d("AuraFilter", "🛑 Blocked: App is categorized as RED")
                     cancelNotification(sbn.key)
-                    blockedNotificationDao.insertBlockedNotification(
-                        BlockedNotificationEntity(packageName = packageName, title = title, content = text, timestamp = System.currentTimeMillis())
-                    )
-                    settingsRepository.incrementBlockedCount() // <-- ADDED: +1 Blocked
+                    blockedNotificationDao.insertBlockedNotification(BlockedNotificationEntity(packageName = pkgName, title = title, content = text, timestamp = System.currentTimeMillis()))
+                    settingsRepository.incrementBlockedCount()
                     return@launch
                 }
 
                 if (category == "ORANGE") {
+                    Log.d("AuraFilter", "⚠️ Review: App is categorized as ORANGE")
                     cancelNotification(sbn.key)
-                    notificationDao.insertNotification(
-                        InterceptedNotificationEntity(packageName = packageName, title = title, content = text, timestamp = System.currentTimeMillis())
-                    )
+                    notificationDao.insertNotification(InterceptedNotificationEntity(packageName = pkgName, title = title, content = text, timestamp = System.currentTimeMillis()))
                     return@launch
                 }
 
-                // 5. If it reaches here, the app is set to GREEN
-                settingsRepository.incrementAllowedCount() // <-- ADDED: +1 Allowed
+                Log.d("AuraFilter", "✅ Allowed: Default Green Path")
+                settingsRepository.incrementAllowedCount()
 
             } catch (e: Exception) {
+                Log.e("AuraFilter", "❌ ERROR in Coroutine: ${e.message}")
                 e.printStackTrace()
             }
         }

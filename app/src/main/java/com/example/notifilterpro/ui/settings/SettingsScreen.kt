@@ -39,7 +39,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     themeViewModel: InboxViewModel = hiltViewModel()
 ) {
-    val isPaused by viewModel.isPaused.collectAsState()
+    val isActive by viewModel.isActive.collectAsState()
     val currentInterval by viewModel.currentInterval.collectAsState()
     val savedThemePreference by themeViewModel.isDarkMode.collectAsState()
     val context = LocalContext.current
@@ -80,14 +80,24 @@ fun SettingsScreen(
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = cardColor), border = androidx.compose.foundation.BorderStroke(1.dp, borderColor), modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Icon(if (isPaused) Icons.Default.PlayCircle else Icons.Default.PauseCircle, contentDescription = null, tint = if (isPaused) subTextColor else cyanAccent, modifier = Modifier.size(28.dp))
+                        Icon(
+                            imageVector = if (isActive) Icons.Default.PlayCircle else Icons.Default.PauseCircle,
+                            contentDescription = null,
+                            tint = if (isActive) cyanAccent else subTextColor,
+                            modifier = Modifier.size(28.dp)
+                        )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
-                            Text(if (isPaused) "Filtering Paused" else "Filtering Active", fontWeight = FontWeight.Bold, color = textColor)
-                            Text("Toggle to temporarily allow all notifications", fontSize = 12.sp, color = subTextColor)
+                            Text(if (isActive) "Filtering Active" else "Filtering Paused", fontWeight = FontWeight.Bold, color = textColor)
+                            Text(if (isActive) "Engine is running" else "All alerts are allowed", fontSize = 12.sp, color = subTextColor)
                         }
                     }
-                    Switch(checked = !isPaused, onCheckedChange = { viewModel.toggleService(!it) }, colors = SwitchDefaults.colors(checkedThumbColor = cyanAccent, checkedTrackColor = cyanAccent.copy(alpha = 0.5f)))
+                    // No more double negatives! If it's active, it's checked.
+                    Switch(
+                        checked = isActive,
+                        onCheckedChange = { viewModel.toggleService(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = cyanAccent, checkedTrackColor = cyanAccent.copy(alpha = 0.5f))
+                    )
                 }
             }
 
