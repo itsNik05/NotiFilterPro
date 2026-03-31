@@ -74,7 +74,9 @@ class AppCategorizerViewModel @Inject constructor(
                     category = rule?.category ?: "GREEN",
                     isWhitelisted = rule?.isWhitelisted ?: true
                 )
-            }.sortedBy { it.appName.lowercase() }
+            }
+                .distinctBy { it.packageName }
+                .sortedBy { it.appName.lowercase() }
 
             _allApps.value = mergedList
         }

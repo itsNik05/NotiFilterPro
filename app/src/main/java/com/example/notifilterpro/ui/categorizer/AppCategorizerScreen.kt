@@ -102,9 +102,15 @@ fun AppCategorizerScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = cardColor),
                 border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-                modifier = Modifier.fillMaxSize().padding(bottom = 16.dp)
+
+                // FIX: Replaced fillMaxSize() with weight(1f).fillMaxWidth()
+                // This forces the list to respect the boundaries of the screen so scrolling works!
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
             ) {
-                LazyColumn {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
                     itemsIndexed(appList, key = { _, app -> app.packageName }) { index, app ->
                         AuraAppRuleItem(
                             app = app,
