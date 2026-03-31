@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Data model remains the same
 data class AppUiModel(
     val packageName: String,
     val appName: String,
@@ -27,14 +26,11 @@ class AppCategorizerViewModel @Inject constructor(
     private val appRuleDao: AppRuleDao
 ) : AndroidViewModel(application) {
 
-    // The raw list of all apps
     private val _allApps = MutableStateFlow<List<AppUiModel>>(emptyList())
 
-    // The current search text
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    // The actual list shown in the UI (Filtered based on search)
     val appList: StateFlow<List<AppUiModel>> = combine(_allApps, _searchQuery) { apps, query ->
         if (query.isBlank()) {
             apps
@@ -62,7 +58,6 @@ class AppCategorizerViewModel @Inject constructor(
             }
 
             val resolveInfos = pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
-            // Using .first() here gets the current snapshot of rules
             val savedRules = appRuleDao.getAllRules().first().associateBy { it.packageName }
 
             val mergedList = resolveInfos.mapNotNull { resolveInfo ->
@@ -75,8 +70,9 @@ class AppCategorizerViewModel @Inject constructor(
                 AppUiModel(
                     packageName = packageName,
                     appName = appName,
+                    // BACK TO GREEN: Uncategorized apps default to Allow
                     category = rule?.category ?: "GREEN",
-                    isWhitelisted = rule?.isWhitelisted ?: false
+                    isWhitelisted = rule?.isWhitelisted ?: true
                 )
             }.sortedBy { it.appName.lowercase() }
 
@@ -88,9 +84,9 @@ class AppCategorizerViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val isWhitelisted = (category == "GREEN")
             val newRule = AppRuleEntity(packageName, appName, category, isWhitelisted)
+
             appRuleDao.insertRule(newRule)
 
-            // Update the local state so the UI reflects the change immediately
             _allApps.value = _allApps.value.map {
                 if (it.packageName == packageName) {
                     it.copy(category = category, isWhitelisted = isWhitelisted)

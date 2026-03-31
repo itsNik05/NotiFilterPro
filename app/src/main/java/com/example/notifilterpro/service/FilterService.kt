@@ -97,7 +97,8 @@ class FilterService : NotificationListenerService() {
                 val isBlockedSender = activeBlockedSenders.any { lowerTitle.contains(it.lowercase()) }
 
                 val rule = appRuleDao.getRuleForApp(pkgName)
-                val category = rule?.category ?: "ORANGE"
+                val category = rule?.category ?: "GREEN"
+                Log.d("AuraFilter", "📦 Searching DB for: $pkgName | Found Rule: $rule | Category applied: $category")
 
                 Log.d("AuraFilter", "⚙️ App Category is: $category")
 
