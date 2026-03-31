@@ -2,6 +2,7 @@ package com.example.notifilterpro.ui.rules
 
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.notifilterpro.data.local.TimeProfileDao
 import com.example.notifilterpro.data.local.TimeProfileEntity
+import com.example.notifilterpro.ui.inbox.InboxViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,94 +35,57 @@ import kotlinx.coroutines.launch
 import java.util.*
 import javax.inject.Inject
 
-// --- THE VIEWMODEL ---
 @HiltViewModel
-class TimeProfilesViewModel @Inject constructor(
-    private val timeProfileDao: TimeProfileDao
-) : ViewModel() {
-
-    val profiles = timeProfileDao.getAllProfiles()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+class TimeProfilesViewModel @Inject constructor(private val timeProfileDao: TimeProfileDao) : ViewModel() {
+    val profiles = timeProfileDao.getAllProfiles().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     fun addProfile(name: String, startH: Int, startM: Int, endH: Int, endM: Int) {
-        if (name.isNotBlank()) {
-            viewModelScope.launch(Dispatchers.IO) {
-                timeProfileDao.insertProfile(
-                    TimeProfileEntity(name, startH, startM, endH, endM, isEnabled = true)
-                )
-            }
-        }
+        if (name.isNotBlank()) viewModelScope.launch(Dispatchers.IO) { timeProfileDao.insertProfile(TimeProfileEntity(name, startH, startM, endH, endM, isEnabled = true)) }
     }
-
-    fun toggleProfile(profile: TimeProfileEntity, isEnabled: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            timeProfileDao.insertProfile(profile.copy(isEnabled = isEnabled))
-        }
-    }
-
-    fun deleteProfile(profile: TimeProfileEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
-            timeProfileDao.deleteProfile(profile)
-        }
-    }
+    fun toggleProfile(profile: TimeProfileEntity, isEnabled: Boolean) { viewModelScope.launch(Dispatchers.IO) { timeProfileDao.insertProfile(profile.copy(isEnabled = isEnabled)) } }
+    fun deleteProfile(profile: TimeProfileEntity) { viewModelScope.launch(Dispatchers.IO) { timeProfileDao.deleteProfile(profile) } }
 }
 
-// --- THE UI ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeProfilesScreen(
-    viewModel: TimeProfilesViewModel = hiltViewModel()
+    viewModel: TimeProfilesViewModel = hiltViewModel(),
+    themeViewModel: InboxViewModel = hiltViewModel()
 ) {
     val profiles by viewModel.profiles.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
+    val savedThemePreference by themeViewModel.isDarkMode.collectAsState()
+    val isDark = savedThemePreference ?: isSystemInDarkTheme()
+
+    val bgColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFF3F4F6)
+    val cardColor = if (isDark) Color(0xFF151B29) else Color.White
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    val subTextColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+
     Scaffold(
+        containerColor = bgColor,
         topBar = {
             TopAppBar(
-                title = { Text("Time Profiles", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                title = { Text("Time Profiles", fontWeight = FontWeight.Bold, color = textColor) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = Color(0xFFF97316) // Aura Orange
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Profile", tint = Color.White)
+            FloatingActionButton(onClick = { showAddDialog = true }, containerColor = Color(0xFFF97316)) {
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-        ) {
-            Text(
-                text = "Focus Modes",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "During these hours, background filtering is strictly enforced. Outside these hours, all notifications are let through.",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp)) {
+            Text("Focus Modes", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = textColor, modifier = Modifier.padding(bottom = 4.dp))
+            Text("During these hours, background filtering is enforced.", fontSize = 14.sp, color = subTextColor, modifier = Modifier.padding(bottom = 16.dp))
 
             if (profiles.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No profiles yet. Tap + to create one!", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No profiles yet.", color = subTextColor) }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(profiles) { profile ->
-                        ProfileCard(
-                            profile = profile,
-                            onToggle = { isEnabled -> viewModel.toggleProfile(profile, isEnabled) },
-                            onDelete = { viewModel.deleteProfile(profile) }
-                        )
+                        ProfileCard(profile, cardColor, textColor, subTextColor, isDark, { viewModel.toggleProfile(profile, it) }, { viewModel.deleteProfile(profile) })
                     }
                 }
             }
@@ -128,131 +93,58 @@ fun TimeProfilesScreen(
     }
 
     if (showAddDialog) {
-        AddProfileDialog(
-            onDismiss = { showAddDialog = false },
-            onSave = { name, sh, sm, eh, em ->
-                viewModel.addProfile(name, sh, sm, eh, em)
-                showAddDialog = false
-            }
-        )
+        AddProfileDialog(isDark, { showAddDialog = false }, { n, sh, sm, eh, em -> viewModel.addProfile(n, sh, sm, eh, em); showAddDialog = false })
     }
 }
 
 @Composable
-fun ProfileCard(
-    profile: TimeProfileEntity,
-    onToggle: (Boolean) -> Unit,
-    onDelete: () -> Unit
-) {
-    // Format the time nicely (e.g., "09:00 AM")
-    val formatTime = { h: Int, m: Int ->
-        val amPm = if (h >= 12) "PM" else "AM"
-        val displayH = if (h % 12 == 0) 12 else h % 12
-        String.format("%02d:%02d %s", displayH, m, amPm)
-    }
+fun ProfileCard(profile: TimeProfileEntity, cardColor: Color, textColor: Color, subTextColor: Color, isDark: Boolean, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+    val formatTime = { h: Int, m: Int -> val displayH = if (h % 12 == 0) 12 else h % 12; String.format("%02d:%02d %s", displayH, m, if (h >= 12) "PM" else "AM") }
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
 
-    val timeString = "${formatTime(profile.startHour, profile.startMinute)} - ${formatTime(profile.endHour, profile.endMinute)}"
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = cardColor), border = androidx.compose.foundation.BorderStroke(1.dp, borderColor), modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                Box(
-                    modifier = Modifier.size(40.dp).background(Color(0xFFF97316).copy(alpha = 0.1f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.size(40.dp).background(Color(0xFFF97316).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFFF97316))
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text(profile.profileName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text(timeString, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(profile.profileName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                    Text("${formatTime(profile.startHour, profile.startMinute)} - ${formatTime(profile.endHour, profile.endMinute)}", fontSize = 13.sp, color = subTextColor)
                 }
             }
-
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(
-                    checked = profile.isEnabled,
-                    onCheckedChange = onToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF97316), checkedTrackColor = Color(0xFFF97316).copy(alpha = 0.5f))
-                )
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-                }
+                Switch(checked = profile.isEnabled, onCheckedChange = onToggle, colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF97316), checkedTrackColor = Color(0xFFF97316).copy(alpha = 0.5f)))
+                IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEF4444)) }
             }
         }
     }
 }
 
 @Composable
-fun AddProfileDialog(
-    onDismiss: () -> Unit,
-    onSave: (String, Int, Int, Int, Int) -> Unit
-) {
+fun AddProfileDialog(isDark: Boolean, onDismiss: () -> Unit, onSave: (String, Int, Int, Int, Int) -> Unit) {
     val context = LocalContext.current
     var name by remember { mutableStateOf("") }
-    var startH by remember { mutableStateOf(9) }
-    var startM by remember { mutableStateOf(0) }
-    var endH by remember { mutableStateOf(17) }
-    var endM by remember { mutableStateOf(0) }
+    var startH by remember { mutableStateOf(9) }; var startM by remember { mutableStateOf(0) }
+    var endH by remember { mutableStateOf(17) }; var endM by remember { mutableStateOf(0) }
+    val formatTime = { h: Int, m: Int -> val displayH = if (h % 12 == 0) 12 else h % 12; String.format("%02d:%02d %s", displayH, m, if (h >= 12) "PM" else "AM") }
 
-    val formatTime = { h: Int, m: Int ->
-        val amPm = if (h >= 12) "PM" else "AM"
-        val displayH = if (h % 12 == 0) 12 else h % 12
-        String.format("%02d:%02d %s", displayH, m, amPm)
-    }
+    val dialogBg = if (isDark) Color(0xFF151B29) else Color.White
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    val buttonBg = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New Focus Mode", fontWeight = FontWeight.Bold) },
+        onDismissRequest = onDismiss, containerColor = dialogBg,
+        title = { Text("New Focus Mode", fontWeight = FontWeight.Bold, color = textColor) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Profile Name (e.g., Deep Work)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Start Time Button
-                Button(
-                    onClick = {
-                        TimePickerDialog(context, { _, h, m -> startH = h; startM = m }, startH, startM, false).show()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text("Start Time: ${formatTime(startH, startM)}")
-                }
-
-                // End Time Button
-                Button(
-                    onClick = {
-                        TimePickerDialog(context, { _, h, m -> endH = h; endM = m }, endH, endM, false).show()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text("End Time: ${formatTime(endH, endM)}")
-                }
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Profile Name", color = textColor) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor, focusedBorderColor = Color(0xFFF97316)))
+                Button(onClick = { TimePickerDialog(context, { _, h, m -> startH = h; startM = m }, startH, startM, false).show() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonBg, contentColor = textColor)) { Text("Start Time: ${formatTime(startH, startM)}") }
+                Button(onClick = { TimePickerDialog(context, { _, h, m -> endH = h; endM = m }, endH, endM, false).show() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = buttonBg, contentColor = textColor)) { Text("End Time: ${formatTime(endH, endM)}") }
             }
         },
-        confirmButton = {
-            Button(onClick = { onSave(name, startH, startM, endH, endM) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316))) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        confirmButton = { Button(onClick = { onSave(name, startH, startM, endH, endM) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316))) { Text("Save", color = Color.White) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = textColor) } }
     )
 }

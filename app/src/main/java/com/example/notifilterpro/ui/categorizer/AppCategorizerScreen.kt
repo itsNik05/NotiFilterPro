@@ -4,6 +4,7 @@ import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,24 +27,41 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.notifilterpro.ui.inbox.InboxViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppCategorizerScreen(
-    viewModel: AppCategorizerViewModel = hiltViewModel()
+    viewModel: AppCategorizerViewModel = hiltViewModel(),
+    themeViewModel: InboxViewModel = hiltViewModel()
 ) {
     val appList by viewModel.appList.collectAsState()
-
-    // 1. Read the search query from the ViewModel
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val savedThemePreference by themeViewModel.isDarkMode.collectAsState()
+
+    val isDark = savedThemePreference ?: isSystemInDarkTheme()
+
+    // Aura Premium Theme Colors
+    val bgColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFF3F4F6)
+    val cardColor = if (isDark) Color(0xFF151B29) else Color.White
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    val subTextColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+    val cyanAccent = if (isDark) Color(0xFF00E5FF) else Color(0xFF06B6D4)
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
 
     Scaffold(
+        containerColor = bgColor,
         topBar = {
             TopAppBar(
-                title = { Text("App Filters", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                title = {
+                    Column {
+                        Text("Aura Filter", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = cyanAccent)
+                        Text("Peace of mind", fontSize = 12.sp, color = subTextColor)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { paddingValues ->
@@ -52,64 +71,49 @@ fun AppCategorizerScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
+            Text("Rule Management", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = textColor, modifier = Modifier.padding(bottom = 4.dp))
+            Text("Set which apps go to the Block, Review, or Allow zones.", fontSize = 14.sp, color = subTextColor, modifier = Modifier.padding(bottom = 16.dp))
 
-
-
-            // Header text matching your design
-            Text(
-                text = "Rule Management",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "Set which apps go to the Block, Review, or Allow zones.",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // --- NEW: THE SEARCH BAR ---
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                placeholder = { Text("Search apps...", fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                placeholder = { Text("Search apps...", fontSize = 14.sp, color = subTextColor) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp), tint = subTextColor) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Close, "Clear", modifier = Modifier.size(20.dp), tint = subTextColor)
                         }
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant
+                    focusedBorderColor = Color(0xFF3B82F6),
+                    unfocusedBorderColor = borderColor,
+                    focusedTextColor = textColor,
+                    unfocusedTextColor = textColor,
+                    cursorColor = Color(0xFF3B82F6)
                 )
             )
 
-            // The beautifully rounded main container card (Untouched!)
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 16.dp)
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                modifier = Modifier.fillMaxSize().padding(bottom = 16.dp)
             ) {
                 LazyColumn {
                     itemsIndexed(appList, key = { _, app -> app.packageName }) { index, app ->
                         AuraAppRuleItem(
                             app = app,
                             isLastItem = index == appList.size - 1,
-                            onRuleChanged = { newCat, isWhite ->
-                                viewModel.updateRule(app.packageName, app.appName, newCat)
-                            }
+                            isDark = isDark,
+                            textColor = textColor,
+                            subTextColor = subTextColor,
+                            borderColor = borderColor,
+                            onRuleChanged = { newCat, _ -> viewModel.updateRule(app.packageName, app.appName, newCat) }
                         )
                     }
                 }
@@ -118,38 +122,40 @@ fun AppCategorizerScreen(
     }
 }
 
-// ============================================================================
-// EVERYTHING BELOW THIS LINE IS YOUR EXACT UNTOUCHED UI CODE
-// ============================================================================
-
 @Composable
 fun AuraAppRuleItem(
     app: AppUiModel,
     isLastItem: Boolean,
+    isDark: Boolean,
+    textColor: Color,
+    subTextColor: Color,
+    borderColor: Color,
     onRuleChanged: (String, Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val pm: PackageManager = context.packageManager
 
-    // Safely load the app icon
-    val iconBitmap = remember(app.packageName) {
-        try { pm.getApplicationIcon(app.packageName).toBitmap().asImageBitmap() } catch (e: Exception) { null }
+    // THE CRASH FIX: State holding the icon, loaded asynchronously!
+    var iconBitmap by remember(app.packageName) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(app.packageName) {
+        withContext(Dispatchers.IO) {
+            try {
+                // Fetch the drawable on a background thread so Android 15 doesn't crash
+                val drawable = pm.getApplicationIcon(app.packageName)
+                val bitmap = drawable.toBitmap()
+                iconBitmap = bitmap.asImageBitmap()
+            } catch (e: Exception) {
+                iconBitmap = null
+            }
+        }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             // Icon
             if (iconBitmap != null) {
-                Image(bitmap = iconBitmap, contentDescription = null, modifier = Modifier.size(40.dp))
+                Image(bitmap = iconBitmap!!, contentDescription = null, modifier = Modifier.size(40.dp))
             } else {
                 Box(modifier = Modifier.size(40.dp).background(Color.Gray.copy(alpha = 0.2f), CircleShape))
             }
@@ -158,61 +164,33 @@ fun AuraAppRuleItem(
 
             // App Name & Package Name
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = app.appName, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                Text(text = app.packageName, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = app.appName, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = textColor)
+                Text(text = app.packageName, fontSize = 11.sp, color = subTextColor)
             }
         }
 
-        // Custom Segmented Control for Categories (Red / Orange / Green)
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CategoryButton(
-                text = "Block",
-                isSelected = app.category == "RED",
-                selectedColor = Color(0xFFEF4444), // Tailwind Red 500
-                onClick = { onRuleChanged("RED", false) },
-                modifier = Modifier.weight(1f)
-            )
-            CategoryButton(
-                text = "Review",
-                isSelected = app.category == "ORANGE",
-                selectedColor = Color(0xFFF97316), // Tailwind Orange 500
-                onClick = { onRuleChanged("ORANGE", false) },
-                modifier = Modifier.weight(1f)
-            )
-            CategoryButton(
-                text = "Allow",
-                isSelected = app.category == "GREEN" || app.isWhitelisted,
-                selectedColor = Color(0xFF22C55E), // Tailwind Green 500
-                onClick = { onRuleChanged("GREEN", true) },
-                modifier = Modifier.weight(1f)
-            )
+            CategoryButton("Block", app.category == "RED", Color(0xFFEF4444), isDark, { onRuleChanged("RED", false) }, Modifier.weight(1f))
+            CategoryButton("Review", app.category == "ORANGE", Color(0xFFF97316), isDark, { onRuleChanged("ORANGE", false) }, Modifier.weight(1f))
+            CategoryButton("Allow", app.category == "GREEN" || app.isWhitelisted, Color(0xFF22C55E), isDark, { onRuleChanged("GREEN", true) }, Modifier.weight(1f))
         }
 
-        // Divider between items (hidden on the very last item for a clean look)
         if (!isLastItem) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), thickness = 1.dp)
+            HorizontalDivider(color = borderColor, thickness = 1.dp)
         }
     }
 }
 
-// Custom modern pill button
 @Composable
-fun CategoryButton(
-    text: String,
-    isSelected: Boolean,
-    selectedColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // If selected, it uses a vibrant tinted background. If not, it's a subtle gray.
-    val bgColor = if (isSelected) selectedColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-    val contentColor = if (isSelected) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant
+fun CategoryButton(text: String, isSelected: Boolean, selectedColor: Color, isDark: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val unselectedBg = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
+    val unselectedText = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+
+    val bgColor = if (isSelected) selectedColor.copy(alpha = 0.15f) else unselectedBg
+    val contentColor = if (isSelected) selectedColor else unselectedText
 
     Box(
         modifier = modifier
@@ -222,11 +200,6 @@ fun CategoryButton(
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = contentColor
-        )
+        Text(text = text, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = contentColor)
     }
 }
