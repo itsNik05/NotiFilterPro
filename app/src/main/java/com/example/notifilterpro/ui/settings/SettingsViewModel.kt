@@ -25,6 +25,20 @@ class SettingsViewModel @Inject constructor(
     private val notificationDao: NotificationDao
 ) : ViewModel() {
 
+    private val prefs = context.getSharedPreferences("noti_prefs", Context.MODE_PRIVATE)
+
+    // --- 0. AUTO-DELETE THRESHOLD (This fixes the red errors in SettingsScreen!) ---
+    // Reads the saved value, defaulting to 24 hours if it hasn't been set yet
+    private val _autoDeleteThreshold = MutableStateFlow(prefs.getInt("auto_delete_threshold", 24))
+    val autoDeleteThreshold: StateFlow<Int> = _autoDeleteThreshold.asStateFlow()
+
+    fun updateAutoDeleteThreshold(newThreshold: Int) {
+        // Updates the UI state
+        _autoDeleteThreshold.value = newThreshold
+        // Saves it so the app remembers next time you open it
+        prefs.edit().putInt("auto_delete_threshold", newThreshold).apply()
+    }
+
     // --- 1. EXISTING DIGEST INTERVAL LOGIC ---
     val currentInterval: StateFlow<Int> = settingsRepository.digestIntervalFlow
         .stateIn(
@@ -39,9 +53,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // --- 2. NEW MASTER TOGGLE LOGIC ---
-    private val prefs = context.getSharedPreferences("noti_prefs", Context.MODE_PRIVATE)
-
+    // --- 2. MASTER TOGGLE LOGIC ---
     private val _isPaused = MutableStateFlow(prefs.getBoolean("is_paused", false))
     val isPaused = _isPaused.asStateFlow()
 
@@ -50,7 +62,7 @@ class SettingsViewModel @Inject constructor(
         _isPaused.value = paused
     }
 
-    // --- 3. NEW CLEAR DATA LOGIC ---
+    // --- 3. CLEAR DATA LOGIC ---
     fun clearAllData() {
         viewModelScope.launch(Dispatchers.IO) {
             blockedDao.clearAllBlocked()

@@ -1,5 +1,6 @@
 package com.example.notifilterpro.ui.rules
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -15,7 +16,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// THESE ARE THE MISSING IMPORTS:
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.notifilterpro.ui.inbox.InboxViewModel
 
@@ -25,10 +25,8 @@ fun RulesHubScreen(
     onNavigateToKeywords: () -> Unit,
     onNavigateToSender: () -> Unit,
     onNavigateToTime: () -> Unit,
-    onNavigateToBlocked: () -> Unit,
     themeViewModel: InboxViewModel = hiltViewModel()
 ) {
-    // FIX: Actively using the themeViewModel so it syncs with the Home screen
     val isDarkMode by themeViewModel.isDarkMode.collectAsState()
     val isDark = isDarkMode ?: isSystemInDarkTheme()
 
@@ -36,31 +34,31 @@ fun RulesHubScreen(
     val cardColor = if (isDark) Color(0xFF151B29) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val subTextColor = if (isDark) Color(0xFF9CA3AF) else Color(0xFF6B7280)
+    val cyanAccent = if (isDark) Color(0xFF00E5FF) else Color(0xFF06B6D4)
 
-    Scaffold(containerColor = bgColor) { padding ->
+    Scaffold(
+        containerColor = bgColor,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Aura Filter", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = cyanAccent)
+                        Text("Peace of mind", fontSize = 12.sp, color = subTextColor)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        }
+    ) { padding ->
         Column(modifier = Modifier
             .padding(padding)
             .padding(16.dp)
             .fillMaxSize()
         ) {
-            Text(
-                text = "Control Center",
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                color = textColor
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-
-            RuleCard("Smart Keywords", "Filter by text", Icons.Default.Search, Color(0xFF3B82F6), cardColor, textColor, subTextColor, onNavigateToKeywords)
-            RuleCard("Sender Rules", "VIPs & Blacklist", Icons.Default.Person, Color(0xFF22C55E), cardColor, textColor, subTextColor, onNavigateToSender)
-            RuleCard("Time Profiles", "Schedule focus", Icons.Default.Schedule, Color(0xFFF97316), cardColor, textColor, subTextColor, onNavigateToTime)
-
-            Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = subTextColor.copy(alpha = 0.1f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // FIX: Actively using onNavigateToBlocked here for the button
-            RuleCard("Blocked History", "View caught alerts", Icons.Default.History, Color(0xFFEF4444), cardColor, textColor, subTextColor, onNavigateToBlocked)
+            // FIX: Blocked History has been completely removed
+            RuleCard("Keyword Filters", "Block or allow based on text", Icons.Default.Search, Color(0xFF3B82F6), cardColor, textColor, subTextColor, onNavigateToKeywords)
+            RuleCard("Sender Rules", "Filter by contact name", Icons.Default.Person, Color(0xFF9333EA), cardColor, textColor, subTextColor, onNavigateToSender)
+            RuleCard("Time Profiles", "E.g., Focus Mode (9 AM - 5 PM)", Icons.Default.Schedule, Color(0xFFF97316), cardColor, textColor, subTextColor, onNavigateToTime)
         }
     }
 }
@@ -85,15 +83,29 @@ fun RuleCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(icon, null, tint = iconColor, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.Bold, color = textColor)
-                Text(subtitle, fontSize = 12.sp, color = subTextColor)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Background box for the icon (matches screenshot)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(iconColor.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, null, tint = iconColor, modifier = Modifier.size(22.dp))
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                    Text(subtitle, fontSize = 12.sp, color = subTextColor)
+                }
             }
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = subTextColor)
         }
     }
 }

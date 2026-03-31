@@ -42,7 +42,6 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // FIX 1: Listen to the shared ViewModel so the background updates instantly
     val isDarkMode by themeViewModel.isDarkMode.collectAsState()
     val isDark = isDarkMode ?: isSystemInDarkTheme()
 
@@ -61,7 +60,6 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
         containerColor = bgColor,
         bottomBar = {
             Column {
-                // Subtle top border for the nav bar
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)))
                 Row(
                     modifier = Modifier
@@ -72,8 +70,11 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CustomBottomNavItem("Home", Icons.Default.Dashboard, currentRoute == "inbox" || currentRoute == "blocked_history", isDark) { navigateToTab("inbox") }
-                    // FIX 2: Use .contains("rules") so sub-menus keep the tab highlighted
-                    CustomBottomNavItem("Rules", Icons.Default.FilterAlt, currentRoute?.contains("rules") == true, isDark) { navigateToTab("rules_hub") }
+
+                    // FIX: Changed .contains("rules") to .startsWith("rules_").
+                    // This stops the "Apps" tab (app_rules) from lighting this up!
+                    CustomBottomNavItem("Rules", Icons.Default.FilterAlt, currentRoute?.startsWith("rules_") == true, isDark) { navigateToTab("rules_hub") }
+
                     CustomBottomNavItem("Apps", Icons.Default.Smartphone, currentRoute == "app_rules", isDark) { navigateToTab("app_rules") }
                     CustomBottomNavItem("Settings", Icons.Default.Settings, currentRoute == "settings", isDark) { navigateToTab("settings") }
                 }
@@ -85,13 +86,13 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
             composable("app_rules") { AppCategorizerScreen() }
             composable("settings") { SettingsScreen() }
             composable("blocked_history") { BlockedHistoryScreen(onBackClick = { navController.popBackStack() }) }
+
+            // FIX: Removed onNavigateToBlocked parameter
             composable("rules_hub") {
                 RulesHubScreen(
                     onNavigateToKeywords = { navController.navigate("rules_keywords") },
                     onNavigateToSender = { navController.navigate("rules_sender") },
-                    onNavigateToTime = { navController.navigate("rules_time") },
-                    // FIX 3: Passed the navigation action so the Blocked button works on the Rules page
-                    onNavigateToBlocked = { navController.navigate("blocked_history") }
+                    onNavigateToTime = { navController.navigate("rules_time") }
                 )
             }
             composable("rules_keywords") { RulesManagerScreen() }
@@ -101,10 +102,9 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
     }
 }
 
-// Custom UI to get that clean "Dot" indicator from your screenshot
 @Composable
 fun CustomBottomNavItem(label: String, icon: ImageVector, isSelected: Boolean, isDark: Boolean, onClick: () -> Unit) {
-    val selectedColor = Color(0xFF3B82F6) // Bright Blue
+    val selectedColor = Color(0xFF3B82F6)
     val unselectedColor = if (isDark) Color(0xFF6B7280) else Color(0xFF9CA3AF)
 
     Column(
@@ -115,7 +115,6 @@ fun CustomBottomNavItem(label: String, icon: ImageVector, isSelected: Boolean, i
         Spacer(modifier = Modifier.height(4.dp))
         Text(label, fontSize = 10.sp, color = if (isSelected) selectedColor else unselectedColor)
         Spacer(modifier = Modifier.height(4.dp))
-        // The Dot
         Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(if (isSelected) selectedColor else Color.Transparent))
     }
 }
