@@ -21,5 +21,5 @@
 #-renamesourcefileattribute SourceFile
 
 # Protect the Application class and Hilt components from being stripped
--keep class com.example.notifilterpro.NotiFilterApp { *; }
--keep @dagger.hilt.android.HiltAndroidApp class * { *; }
+#-keep class com.nuviolabs.aurafilter.AuraFilterApp { *; }
+#-keep @dagger.hilt.android.HiltAndroidApp class * { *; }
