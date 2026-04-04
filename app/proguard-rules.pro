@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Protect the Application class and Hilt components from being stripped
+-keep class com.example.notifilterpro.NotiFilterApp { *; }
+-keep @dagger.hilt.android.HiltAndroidApp class * { *; }

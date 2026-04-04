@@ -4,8 +4,10 @@ import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import androidx.annotation.Keep
 import javax.inject.Inject
 
+@Keep
 @HiltAndroidApp
 class NotiFilterApp : Application(), Configuration.Provider {
 

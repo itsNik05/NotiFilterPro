@@ -7,15 +7,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.notifilterpro"
-    compileSdk = 34
+    namespace = "com.nuviolabs.aurafilter"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.notifilterpro"
+        applicationId = "com.nuviolabs.aurafilter"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 4
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

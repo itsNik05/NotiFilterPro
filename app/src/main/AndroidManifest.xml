@@ -7,9 +7,10 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
-
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
-        android:name=".NotiFilterApp"
+        android:name="com.example.notifilterpro.NotiFilterApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -19,7 +20,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NotiFilterPro">
         <activity
-            android:name=".MainActivity"
+            android:name="com.example.notifilterpro.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.NotiFilterPro">
@@ -31,8 +32,8 @@
         </activity>
 
         <service
-            android:name=".service.FilterService"
-            android:label="NotiFilter Engine"
+            android:name="com.example.notifilterpro.service.FilterService"
+            android:label="@string/filter_service_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>

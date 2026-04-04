@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">NotiFilterPro</string>
+    <string name="app_name">Aura Filter</string>
+    <string name="filter_service_name">Aura Filter Engine</string>
 </resources>
