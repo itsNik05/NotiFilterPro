@@ -4,7 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.NotificationManagerCompat
@@ -15,6 +21,7 @@ import com.nuviolabs.aurafilter.ui.MainScreen
 import com.nuviolabs.aurafilter.ui.OnboardingScreen
 import com.nuviolabs.aurafilter.ui.theme.AuraFilterTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -29,8 +36,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
+            val coroutineScope = rememberCoroutineScope()
 
-            // 1. Check if the app currently has notification access
             var hasPermission by remember {
                 mutableStateOf(
                     NotificationManagerCompat.getEnabledListenerPackages(context)
@@ -38,7 +45,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // 2. Re-check the permission every time the app comes to the foreground
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
@@ -50,19 +56,28 @@ class MainActivity : ComponentActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
-            // 3. Theme setup
             val isSystemDark = isSystemInDarkTheme()
             val savedThemePreference by settingsRepository.isDarkModeFlow.collectAsState(initial = null)
+            val hasSeenOnboarding by settingsRepository.hasSeenOnboardingFlow.collectAsState(initial = false)
             val useDarkTheme = savedThemePreference ?: isSystemDark
 
             AuraFilterTheme(darkTheme = useDarkTheme) {
-                // 4. The Traffic Light! 🚦
-                if (hasPermission) {
+                if (hasSeenOnboarding && hasPermission) {
                     MainScreen()
                 } else {
                     OnboardingScreen(
+                        hasSeenOnboarding = hasSeenOnboarding,
+                        hasPermission = hasPermission,
+                        onIntroComplete = {
+                            coroutineScope.launch {
+                                settingsRepository.markOnboardingSeen()
+                            }
+                        },
                         onPermissionGranted = {
                             hasPermission = true
+                            coroutineScope.launch {
+                                settingsRepository.markOnboardingSeen()
+                            }
                         }
                     )
                 }

@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.text.format.DateFormat
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,13 +18,33 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,7 +60,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.nuviolabs.aurafilter.data.local.InterceptedNotificationEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.*
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +72,7 @@ fun InboxScreen(
     val blockedCount by viewModel.blockedCount.collectAsState()
     val allowedCount by viewModel.allowedCount.collectAsState()
     val savedThemePreference by viewModel.isDarkMode.collectAsState()
+    var showClearAllDialog by remember { mutableStateOf(false) }
 
     val isDark = savedThemePreference ?: isSystemInDarkTheme()
 
@@ -69,9 +91,22 @@ fun InboxScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Aura Filter", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = cyanAccent)
-                        Text("Peace of mind", fontSize = 12.sp, color = subTextColor)
+                    Column(modifier = Modifier.padding(end = 12.dp)) {
+                        Text(
+                            text = "Aura Filter",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = cyanAccent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Peace of mind",
+                            fontSize = 11.sp,
+                            color = subTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 },
                 actions = {
@@ -88,9 +123,6 @@ fun InboxScreen(
         }
     ) { paddingValues ->
         LazyColumn(
-            // FIX 1: Android 16 Scroll Bug Fix
-            // Removed .padding(paddingValues) from here and moved it into contentPadding below.
-            // This prevents the edge-to-edge layout from crushing the list constraints.
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = 16.dp,
@@ -100,46 +132,106 @@ fun InboxScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- 1. STATS ROW ---
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCard(
-                        modifier = Modifier.weight(1f).clickable { onNavigateToBlocked() },
-                        title = "BLOCKED", count = blockedCount.toString(), iconColor = redAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        title = "REVIEW", count = notifications.size.toString(), iconColor = orangeAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        title = "ALLOWED", count = allowedCount.toString(), iconColor = greenAccent, cardBg = cardColor, textColor = textColor, subTextColor = subTextColor
-                    )
-                }
-            }
-
-            // --- 2. QUEUE HEADER ---
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(orangeAccent))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Needs Review", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = textColor)
+                    StatCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateToBlocked() },
+                        title = "BLOCKED",
+                        count = blockedCount.toString(),
+                        iconColor = redAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        title = "REVIEW",
+                        count = notifications.size.toString(),
+                        iconColor = orangeAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        title = "ALLOWED",
+                        count = allowedCount.toString(),
+                        iconColor = greenAccent,
+                        cardBg = cardColor,
+                        textColor = textColor,
+                        subTextColor = subTextColor
+                    )
+                }
+            }
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(orangeAccent))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Needs Review", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = textColor)
+                        }
+                        Surface(
+                            color = if (isDark) Color(0xFF1E2433) else Color(0xFFE9EEF5),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(orangeAccent)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${notifications.size} queued",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = subTextColor,
+                                    maxLines = 1
+                                )
+                            }
+                        }
                     }
-                    Surface(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), shape = CircleShape) {
-                        Text("${notifications.size} pending", modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), fontSize = 12.sp, color = subTextColor)
+                    AnimatedVisibility(visible = notifications.isNotEmpty()) {
+                        TextButton(
+                            onClick = { showClearAllDialog = true },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = orangeAccent, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Clear all review items", color = orangeAccent, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
 
-            // --- 3. REVIEW CARDS ---
             if (notifications.isEmpty()) {
                 item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(48.dp), tint = greenAccent.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("You're all caught up!", color = subTextColor)
@@ -153,20 +245,66 @@ fun InboxScreen(
                         cardColor = cardColor,
                         textColor = textColor,
                         subTextColor = subTextColor,
-                        onBlock = { viewModel.deleteNotification(notification.id) },
-                        onAllow = { viewModel.deleteNotification(notification.id) }
+                        onDismiss = { viewModel.deleteNotification(notification.id) }
                     )
                 }
             }
         }
     }
+
+    if (showClearAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllDialog = false },
+            title = { Text("Clear review queue?") },
+            text = { Text("This will remove all notifications from the review page.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearAll()
+                        showClearAllDialog = false
+                    }
+                ) {
+                    Text("Clear all")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun StatCard(modifier: Modifier, title: String, count: String, iconColor: Color, cardBg: Color, textColor: Color, subTextColor: Color) {
-    Card(modifier = modifier.height(110.dp), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = cardBg)) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Box(modifier = Modifier.size(28.dp).clip(CircleShape).border(1.dp, iconColor.copy(alpha = 0.3f), CircleShape), contentAlignment = Alignment.Center) {
+private fun StatCard(
+    modifier: Modifier,
+    title: String,
+    count: String,
+    iconColor: Color,
+    cardBg: Color,
+    textColor: Color,
+    subTextColor: Color
+) {
+    Card(
+        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, iconColor.copy(alpha = 0.3f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(Icons.Default.Shield, contentDescription = null, tint = iconColor, modifier = Modifier.size(14.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -176,15 +314,15 @@ fun StatCard(modifier: Modifier, title: String, count: String, iconColor: Color,
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AuraNotificationCard(
+private fun AuraNotificationCard(
     notification: InterceptedNotificationEntity,
     isDark: Boolean,
     cardColor: Color,
     textColor: Color,
     subTextColor: Color,
-    onBlock: () -> Unit,
-    onAllow: () -> Unit
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val packageManager = context.packageManager
@@ -200,114 +338,115 @@ fun AuraNotificationCard(
         }
     }
 
-    // FIX 2: Load icon off the main thread using produceState + Dispatchers.IO
-    // This prevents composition-thread blocking which caused crashes on Android 16
     val appIcon by produceState<ImageBitmap?>(initialValue = null, notification.packageName) {
         value = withContext(Dispatchers.IO) {
             getAppIconBitmap(context, notification.packageName)
         }
     }
 
-    val blockBg = if (isDark) Color(0xFF2A1515) else Color(0xFFFFF0F0)
-    val blockText = Color(0xFFEF4444)
-    val allowBg = if (isDark) Color(0xFF14291E) else Color(0xFFEEFDF3)
-    val allowText = Color(0xFF22C55E)
-
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable {
-            val launchIntent = packageManager.getLaunchIntentForPackage(notification.packageName)
-            if (launchIntent != null) {
-                context.startActivity(launchIntent)
+    val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { totalDistance -> totalDistance * 0.3f },
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) {
+                onDismiss()
+                true
             } else {
-                Toast.makeText(context, "Cannot open", Toast.LENGTH_SHORT).show()
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val dismissColor = if (isDark) Color(0xFF132031) else Color(0xFFE0F2FE)
+            val dismissText = if (isDark) Color(0xFF7DD3FC) else Color(0xFF0369A1)
+            val alignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                Alignment.CenterEnd
+            } else {
+                Alignment.CenterStart
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(dismissColor)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = dismissText)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Remove", color = dismissText, fontWeight = FontWeight.SemiBold)
+                }
             }
         },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = cardColor)
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(notification.packageName)
+                    if (launchIntent != null) {
+                        context.startActivity(launchIntent)
+                    } else {
+                        Toast.makeText(context, "Cannot open", Toast.LENGTH_SHORT).show()
+                    }
+                },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = cardColor)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (appIcon != null) {
+                        Image(
+                            bitmap = appIcon!!,
+                            contentDescription = "App Icon",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.05f))
+                        )
+                    }
 
-                // Displays the real App Icon (loaded asynchronously)
-                if (appIcon != null) {
-                    Image(
-                        bitmap = appIcon!!,
-                        contentDescription = "App Icon",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(text = realAppName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = textColor)
+                        Text(text = timeString, fontSize = 12.sp, color = subTextColor)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = notification.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = textColor)
+                if (notification.content.isNotBlank()) {
+                    Text(
+                        text = notification.content,
+                        fontSize = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = subTextColor
                     )
-                } else {
-                    // Placeholder shown while icon loads
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.05f)
-                            )
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(text = realAppName, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = textColor)
-                    Text(text = timeString, fontSize = 12.sp, color = subTextColor)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = notification.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = textColor)
-            if (notification.content.isNotBlank()) {
-                Text(
-                    text = notification.content,
-                    fontSize = 14.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = subTextColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onBlock,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = blockBg, contentColor = blockText),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Block", fontWeight = FontWeight.SemiBold)
-                }
-                Button(
-                    onClick = onAllow,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = allowBg, contentColor = allowText),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Allow", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
 }
 
-// --- HELPER FUNCTION ---
-// FIX 3: Always draw into a fixed 96x96 bitmap.
-// The old code used intrinsicWidth/Height which can return huge values for
-// AdaptiveIconDrawable on Android 8+, causing OOM crashes mid-scroll on Android 16.
 fun getAppIconBitmap(context: Context, packageName: String): ImageBitmap? {
     return try {
         val drawable = context.packageManager.getApplicationIcon(packageName)
-        val SIZE = 96 // Fixed safe size — prevents OOM from large adaptive icon dimensions
+        val size = 96
 
-        val bitmap = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        drawable.setBounds(0, 0, SIZE, SIZE)
+        drawable.setBounds(0, 0, size, size)
         drawable.draw(canvas)
         bitmap.asImageBitmap()
     } catch (e: Exception) {

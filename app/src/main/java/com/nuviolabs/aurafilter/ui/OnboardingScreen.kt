@@ -12,9 +12,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,12 +46,16 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OnboardingScreen(onPermissionGranted: () -> Unit) {
+fun OnboardingScreen(
+    hasSeenOnboarding: Boolean,
+    hasPermission: Boolean,
+    onIntroComplete: () -> Unit,
+    onPermissionGranted: () -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
-    // Aesthetic Colors
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFF3F4F6)
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -46,19 +63,16 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
     val cyanAccent = if (isDark) Color(0xFF00E5FF) else Color(0xFF06B6D4)
     val cardColor = if (isDark) Color(0xFF151B29) else Color.White
 
-    // Swipeable Pager State
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    val totalPages = if (hasSeenOnboarding) 1 else 2
+    val pagerState = rememberPagerState(pageCount = { totalPages })
 
-    // This launcher handles the Android 13+ POST_NOTIFICATIONS popup
     val postNotificationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { _ ->
-        // Move to the Listener Settings after they answer the popup
         val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         context.startActivity(intent)
     }
 
-    // Auto-Advance Observer
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -80,27 +94,27 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
                 .padding(paddingValues),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            // The Swipeable Content
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.weight(1f)
             ) { page ->
-                when (page) {
-                    0 -> OnboardingPage(
-                        icon = Icons.Default.Shield,
-                        iconTint = cyanAccent,
-                        title = "Welcome to Aura Filter",
-                        description = "Take back your peace of mind. Automatically block spam, mute distractions, and review notifications on your own schedule.",
-                        textColor = textColor, subTextColor = subTextColor
+                if (!hasSeenOnboarding && page == 0) {
+                    IntroPage(
+                        textColor = textColor,
+                        subTextColor = subTextColor,
+                        cyanAccent = cyanAccent,
+                        cardColor = cardColor
                     )
-                    1 -> MechanicPage(textColor, subTextColor, cardColor)
-                    2 -> BatteryPage(textColor, subTextColor, cyanAccent, cardColor)
-                    3 -> PermissionPage(textColor, subTextColor, cyanAccent)
+                } else {
+                    PermissionPage(
+                        textColor = textColor,
+                        subTextColor = subTextColor,
+                        cyanAccent = cyanAccent,
+                        hasPermission = hasPermission
+                    )
                 }
             }
 
-            // Bottom Navigation Area
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -108,9 +122,8 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Page Indicator Dots
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    repeat(4) { index ->
+                    repeat(totalPages) { index ->
                         val color = if (pagerState.currentPage == index) cyanAccent else subTextColor.copy(alpha = 0.3f)
                         val width = if (pagerState.currentPage == index) 24.dp else 8.dp
                         Box(
@@ -123,24 +136,26 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
                     }
                 }
 
-                if (pagerState.currentPage < 3) {
+                if (!hasSeenOnboarding && pagerState.currentPage == 0) {
                     FloatingActionButton(
                         onClick = {
+                            onIntroComplete()
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                pagerState.animateScrollToPage(1)
                             }
                         },
                         containerColor = cyanAccent,
                         contentColor = Color.Black,
                         shape = CircleShape
                     ) {
-                        // FIX: Updated to the AutoMirrored version to clear the warning
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next")
                     }
                 } else {
                     Button(
                         onClick = {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            if (hasPermission) {
+                                onPermissionGranted()
+                            } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                 postNotificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                             } else {
                                 val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
@@ -151,7 +166,7 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.height(50.dp)
                     ) {
-                        Text("Grant Access", fontWeight = FontWeight.Bold)
+                        Text(if (hasPermission) "Open Aura Filter" else "Grant Access", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -159,48 +174,67 @@ fun OnboardingScreen(onPermissionGranted: () -> Unit) {
     }
 }
 
-// --- STANDARD PAGE TEMPLATE ---
 @Composable
-fun OnboardingPage(icon: ImageVector, iconTint: Color, title: String, description: String, textColor: Color, subTextColor: Color) {
+private fun IntroPage(
+    textColor: Color,
+    subTextColor: Color,
+    cyanAccent: Color,
+    cardColor: Color
+) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(modifier = Modifier.size(100.dp).background(iconTint.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(50.dp), tint = iconTint)
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(cyanAccent.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(50.dp), tint = cyanAccent)
         }
         Spacer(modifier = Modifier.height(32.dp))
-        Text(text = title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = textColor, textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = description, fontSize = 16.sp, color = subTextColor, textAlign = TextAlign.Center, lineHeight = 24.sp)
-    }
-}
-
-// --- SLIDE 2: HOW IT WORKS ---
-@Composable
-fun MechanicPage(textColor: Color, subTextColor: Color, cardColor: Color) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("How it Works", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = textColor)
+        Text(text = "Aura Filter", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = textColor)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Aura Filter quietly catches distracting notifications before they break your focus. Important alerts stay visible, and everything else waits for you in review.",
+            fontSize = 16.sp,
+            color = subTextColor,
+            textAlign = TextAlign.Center,
+            lineHeight = 24.sp
+        )
         Spacer(modifier = Modifier.height(32.dp))
-
-        MechanicRow(Icons.Default.CheckCircle, Color(0xFF22C55E), "Allow Zone", "VIPs and essential apps bypass the filter.", textColor, subTextColor, cardColor)
+        MechanicRow(Icons.Default.CheckCircle, Color(0xFF22C55E), "Allow", "Keep trusted people and important apps flowing normally.", textColor, subTextColor, cardColor)
         Spacer(modifier = Modifier.height(16.dp))
-        MechanicRow(Icons.Default.Warning, Color(0xFFF97316), "Review Zone", "Uncategorized alerts are held here for you.", textColor, subTextColor, cardColor)
+        MechanicRow(Icons.Default.Warning, Color(0xFFF97316), "Review", "Hold uncertain notifications until you are ready to look.", textColor, subTextColor, cardColor)
         Spacer(modifier = Modifier.height(16.dp))
-        MechanicRow(Icons.Default.Cancel, Color(0xFFEF4444), "Block Zone", "Spam and distractions are instantly destroyed.", textColor, subTextColor, cardColor)
+        MechanicRow(Icons.Default.Cancel, Color(0xFFEF4444), "Block", "Push obvious spam and noise out of the way instantly.", textColor, subTextColor, cardColor)
     }
 }
 
 @Composable
-fun MechanicRow(icon: ImageVector, iconTint: Color, title: String, desc: String, textColor: Color, subTextColor: Color, cardColor: Color) {
-    Card(colors = CardDefaults.cardColors(containerColor = cardColor), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = iconTint, modifier = Modifier.size(32.dp))
+private fun MechanicRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    desc: String,
+    textColor: Color,
+    subTextColor: Color,
+    cardColor: Color
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(title, fontWeight = FontWeight.Bold, color = textColor)
@@ -210,53 +244,47 @@ fun MechanicRow(icon: ImageVector, iconTint: Color, title: String, desc: String,
     }
 }
 
-// --- SLIDE 3: BATTERY ---
 @Composable
-fun BatteryPage(textColor: Color, subTextColor: Color, cyanAccent: Color, cardColor: Color) {
-    val context = LocalContext.current
+private fun PermissionPage(
+    textColor: Color,
+    subTextColor: Color,
+    cyanAccent: Color,
+    hasPermission: Boolean
+) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(modifier = Modifier.size(100.dp).background(Color(0xFFEAB308).copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.BatteryAlert, contentDescription = null, modifier = Modifier.size(50.dp), tint = Color(0xFFEAB308))
-        }
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(text = "Keep the Engine Running", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = textColor, textAlign = TextAlign.Center)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "Android phones like to kill background apps. Please exempt Aura from battery restrictions so we can keep catching spam.", fontSize = 16.sp, color = subTextColor, textAlign = TextAlign.Center, lineHeight = 24.sp)
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Button(
-            onClick = {
-                // FIX: Removed the restricted intent to keep you safe from Play Store rejection.
-                // This now safely opens the general Battery Optimization settings page instead.
-                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                context.startActivity(intent)
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = cardColor, contentColor = cyanAccent),
-            shape = RoundedCornerShape(12.dp)
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(cyanAccent.copy(alpha = 0.1f), CircleShape),
+            contentAlignment = Alignment.Center
         ) {
-            Text("Open Battery Settings")
-        }
-    }
-}
-
-// --- SLIDE 4: PERMISSION ---
-@Composable
-fun PermissionPage(textColor: Color, subTextColor: Color, cyanAccent: Color) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(modifier = Modifier.size(100.dp).background(cyanAccent.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(50.dp), tint = cyanAccent)
         }
         Spacer(modifier = Modifier.height(32.dp))
-        Text(text = "The Final Step", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = textColor, textAlign = TextAlign.Center)
+        Text(
+            text = if (hasPermission) "You're Ready" else "Turn On Notification Access",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textAlign = TextAlign.Center
+        )
         Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "To do its job, Aura Filter needs permission to read incoming notifications. We process everything locally—your data never leaves your device.", fontSize = 16.sp, color = subTextColor, textAlign = TextAlign.Center, lineHeight = 24.sp)
+        Text(
+            text = if (hasPermission) {
+                "Aura Filter is set up. You can start reviewing notifications and tuning your rules right away."
+            } else {
+                "To do its job, Aura Filter needs permission to read incoming notifications. Everything stays on your device."
+            },
+            fontSize = 16.sp,
+            color = subTextColor,
+            textAlign = TextAlign.Center,
+            lineHeight = 24.sp
+        )
     }
 }
