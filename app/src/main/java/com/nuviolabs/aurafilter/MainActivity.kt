@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,8 @@ import com.nuviolabs.aurafilter.data.preferences.SettingsRepository
 import com.nuviolabs.aurafilter.ui.MainScreen
 import com.nuviolabs.aurafilter.ui.OnboardingScreen
 import com.nuviolabs.aurafilter.ui.theme.AuraFilterTheme
+import com.nuviolabs.aurafilter.worker.AutoClearScheduler
+import com.nuviolabs.aurafilter.worker.DigestScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -59,7 +62,20 @@ class MainActivity : ComponentActivity() {
             val isSystemDark = isSystemInDarkTheme()
             val savedThemePreference by settingsRepository.isDarkModeFlow.collectAsState(initial = null)
             val hasSeenOnboarding by settingsRepository.hasSeenOnboardingFlow.collectAsState(initial = false)
+            val currentDigestInterval by settingsRepository.digestIntervalFlow.collectAsState(initial = 2)
             val useDarkTheme = savedThemePreference ?: isSystemDark
+            val prefs = remember(context) {
+                context.getSharedPreferences("noti_prefs", MODE_PRIVATE)
+            }
+
+            LaunchedEffect(currentDigestInterval) {
+                if (prefs.getBoolean("is_active", true)) {
+                    DigestScheduler.schedule(context, currentDigestInterval.toLong())
+                } else {
+                    DigestScheduler.cancel(context)
+                }
+                AutoClearScheduler.schedule(context)
+            }
 
             AuraFilterTheme(darkTheme = useDarkTheme) {
                 if (hasSeenOnboarding && hasPermission) {

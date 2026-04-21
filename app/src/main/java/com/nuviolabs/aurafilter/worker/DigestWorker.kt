@@ -2,12 +2,17 @@ package com.nuviolabs.aurafilter.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.nuviolabs.aurafilter.MainActivity
+import com.nuviolabs.aurafilter.R
 import com.nuviolabs.aurafilter.data.local.NotificationDao
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -40,6 +45,15 @@ class DigestWorker @AssistedInject constructor(
     private fun showSummaryNotification(count: Int) {
         val channelId = "digest_channel"
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            1001,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         // Android 8.0+ requires a Notification Channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -55,14 +69,18 @@ class DigestWorker @AssistedInject constructor(
 
         // Build the actual notification
         val builder = NotificationCompat.Builder(context, channelId)
-            // Note: Replace android.R.drawable.ic_dialog_info with your app's actual icon later
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Notification Digest")
+            .setSmallIcon(R.mipmap.aura_launcher)
+            .setContentTitle("Aura Filter Review")
             .setContentText("You have $count notifications waiting for review.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("You have $count notifications waiting in review. Open Aura Filter to clear or inspect them.")
+            )
 
         // Show it! (We use a fixed ID so it updates the same notification instead of making multiples)
-        notificationManager.notify(1001, builder.build())
+        NotificationManagerCompat.from(context).notify(1001, builder.build())
     }
 }

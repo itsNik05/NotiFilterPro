@@ -118,7 +118,10 @@ fun InboxScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = bgColor,
+                    scrolledContainerColor = bgColor
+                )
             )
         }
     ) { paddingValues ->

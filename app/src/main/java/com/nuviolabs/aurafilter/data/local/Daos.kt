@@ -54,6 +54,9 @@ interface BlockedNotificationDao {
     @Query("DELETE FROM blocked_notifications")
     suspend fun clearAll()
 
+    @Query("DELETE FROM blocked_notifications WHERE timestamp < :threshold")
+    suspend fun deleteBlockedNotificationsOlderThan(threshold: Long)
+
     @Query("DELETE FROM blocked_notifications")
     suspend fun clearAllBlocked()
 }

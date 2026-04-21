@@ -56,6 +56,7 @@ fun BlockedHistoryScreen(
 ) {
     val blockedList by viewModel.blockedList.collectAsState()
     val savedThemePreference by themeViewModel.isDarkMode.collectAsState()
+    var showClearDialog by remember { mutableStateOf(false) }
     val isDark = savedThemePreference ?: isSystemInDarkTheme()
 
     // Aura Premium Palette
@@ -74,11 +75,14 @@ fun BlockedHistoryScreen(
                     IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, "Back", tint = textColor) }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.clearHistory() }) {
+                    IconButton(onClick = { showClearDialog = true }) {
                         Icon(Icons.Default.DeleteOutline, "Clear All", tint = redAccent)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = bgColor,
+                    scrolledContainerColor = bgColor
+                )
             )
         }
     ) { padding ->
@@ -97,6 +101,30 @@ fun BlockedHistoryScreen(
                 }
             }
         }
+    }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            containerColor = cardColor,
+            title = { Text("Clear blocked history?", fontWeight = FontWeight.Bold, color = textColor) },
+            text = { Text("This will permanently delete all blocked notification logs.", color = subTextColor) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearHistory()
+                        showClearDialog = false
+                    }
+                ) {
+                    Text("Delete", color = redAccent, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text("Cancel", color = textColor)
+                }
+            }
+        )
     }
 }
 
