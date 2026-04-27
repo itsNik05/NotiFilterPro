@@ -5,13 +5,24 @@ import androidx.lifecycle.viewModelScope
 import com.nuviolabs.aurafilter.data.local.InterceptedNotificationEntity
 import com.nuviolabs.aurafilter.data.local.NotificationDao
 import com.nuviolabs.aurafilter.data.preferences.SettingsRepository
+import com.nuviolabs.aurafilter.data.preferences.WeeklyTrendPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class WeeklyOverview(
+    val blocked: Int = 0,
+    val review: Int = 0,
+    val allowed: Int = 0,
+    val total: Int = 0,
+    val hoursSaved: Float = 0f,
+    val trend: List<WeeklyTrendPoint> = emptyList()
+)
 
 @HiltViewModel
 class InboxViewModel @Inject constructor(
@@ -42,6 +53,28 @@ class InboxViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0
         )
+
+    val weeklyOverview: StateFlow<WeeklyOverview> = combine(
+        settingsRepository.weeklyBlockedCountFlow,
+        settingsRepository.weeklyReviewCountFlow,
+        settingsRepository.weeklyAllowedCountFlow,
+        settingsRepository.weeklyTrendFlow
+    ) { blocked, review, allowed, trend ->
+        val total = blocked + review + allowed
+        val secondsSaved = (blocked * 45f) + (review * 20f)
+        WeeklyOverview(
+            blocked = blocked,
+            review = review,
+            allowed = allowed,
+            total = total,
+            hoursSaved = secondsSaved / 3600f,
+            trend = trend
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = WeeklyOverview()
+    )
 
     fun deleteNotification(id: Long) {
         viewModelScope.launch(Dispatchers.IO) {

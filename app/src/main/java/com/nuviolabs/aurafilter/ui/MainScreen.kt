@@ -30,11 +30,13 @@ import com.nuviolabs.aurafilter.ui.categorizer.AppCategorizerScreen
 import com.nuviolabs.aurafilter.ui.inbox.BlockedHistoryScreen
 import com.nuviolabs.aurafilter.ui.inbox.InboxScreen
 import com.nuviolabs.aurafilter.ui.inbox.InboxViewModel
+import com.nuviolabs.aurafilter.ui.inbox.ReviewHistoryScreen
 import com.nuviolabs.aurafilter.ui.rules.RulesHubScreen
 import com.nuviolabs.aurafilter.ui.rules.RulesManagerScreen
 import com.nuviolabs.aurafilter.ui.rules.SenderRulesScreen
 import com.nuviolabs.aurafilter.ui.rules.TimeProfilesScreen
 import com.nuviolabs.aurafilter.ui.settings.SettingsScreen
+import com.nuviolabs.aurafilter.ui.theme.AuraStyle
 
 @Composable
 fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
@@ -44,9 +46,10 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
 
     val isDarkMode by themeViewModel.isDarkMode.collectAsState()
     val isDark = isDarkMode ?: isSystemInDarkTheme()
+    val palette = AuraStyle.palette(isDark)
 
-    val bgColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFF3F4F6)
-    val navColor = if (isDark) Color(0xFF0B0F19) else Color(0xFFFFFFFF)
+    val bgColor = palette.bg
+    val navColor = palette.bg.copy(alpha = 0.97f)
 
     val navigateToTab: (String) -> Unit = { route ->
         navController.navigate(route) {
@@ -60,16 +63,16 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
         containerColor = bgColor,
         bottomBar = {
             Column {
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(palette.border))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(navColor)
-                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                        .padding(vertical = 10.dp, horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CustomBottomNavItem("Home", Icons.Default.Dashboard, currentRoute == "inbox" || currentRoute == "blocked_history", isDark) { navigateToTab("inbox") }
+                    CustomBottomNavItem("Home", Icons.Default.Dashboard, currentRoute == "inbox" || currentRoute == "blocked_history" || currentRoute == "review_history", isDark) { navigateToTab("inbox") }
 
                     // FIX: Changed .contains("rules") to .startsWith("rules_").
                     // This stops the "Apps" tab (app_rules) from lighting this up!
@@ -82,10 +85,16 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
         }
     ) { innerPadding ->
         NavHost(navController = navController, startDestination = "inbox", modifier = Modifier.padding(innerPadding)) {
-            composable("inbox") { InboxScreen(onNavigateToBlocked = { navController.navigate("blocked_history") }) }
+            composable("inbox") {
+                InboxScreen(
+                    onNavigateToBlocked = { navController.navigate("blocked_history") },
+                    onNavigateToReview = { navController.navigate("review_history") }
+                )
+            }
             composable("app_rules") { AppCategorizerScreen() }
             composable("settings") { SettingsScreen() }
             composable("blocked_history") { BlockedHistoryScreen(onBackClick = { navController.popBackStack() }) }
+            composable("review_history") { ReviewHistoryScreen(onBackClick = { navController.popBackStack() }) }
 
             // FIX: Removed onNavigateToBlocked parameter
             composable("rules_hub") {
@@ -104,17 +113,20 @@ fun MainScreen(themeViewModel: InboxViewModel = hiltViewModel()) {
 
 @Composable
 fun CustomBottomNavItem(label: String, icon: ImageVector, isSelected: Boolean, isDark: Boolean, onClick: () -> Unit) {
-    val selectedColor = Color(0xFF3B82F6)
-    val unselectedColor = if (isDark) Color(0xFF6B7280) else Color(0xFF9CA3AF)
+    val selectedColor = AuraStyle.Cyan
+    val unselectedColor = AuraStyle.palette(isDark).muted
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+        modifier = Modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Icon(icon, contentDescription = label, tint = if (isSelected) selectedColor else unselectedColor, modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(label, fontSize = 10.sp, color = if (isSelected) selectedColor else unselectedColor)
-        Spacer(modifier = Modifier.height(4.dp))
+        Icon(icon, contentDescription = label, tint = if (isSelected) selectedColor else unselectedColor, modifier = Modifier.size(21.dp))
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(label.uppercase(), fontSize = 8.sp, color = if (isSelected) selectedColor else unselectedColor, letterSpacing = 0.5.sp)
+        Spacer(modifier = Modifier.height(5.dp))
         Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(if (isSelected) selectedColor else Color.Transparent))
     }
 }

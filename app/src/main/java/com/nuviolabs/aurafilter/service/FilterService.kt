@@ -134,6 +134,7 @@ class FilterService : NotificationListenerService() {
                     Log.d("AuraFilter", "⚠️ Review: App is categorized as ORANGE")
                     cancelNotification(sbn.key)
                     notificationDao.insertNotification(InterceptedNotificationEntity(packageName = pkgName, title = title, content = text, timestamp = System.currentTimeMillis()))
+                    settingsRepository.incrementReviewCount()
                     return@launch
                 }
 

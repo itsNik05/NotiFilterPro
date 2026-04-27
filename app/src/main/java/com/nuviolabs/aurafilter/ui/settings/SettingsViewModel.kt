@@ -49,6 +49,13 @@ class SettingsViewModel @Inject constructor(
             initialValue = 2
         )
 
+    val accentColor: StateFlow<Int> = settingsRepository.accentColorFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
     // Keep this above init so the initial digest sync does not read an uninitialized state.
     private val _isActive = MutableStateFlow(prefs.getBoolean("is_active", true))
     val isActive = _isActive.asStateFlow()
@@ -73,6 +80,22 @@ class SettingsViewModel @Inject constructor(
         _isActive.value = active
         viewModelScope.launch {
             syncDigestSchedule(currentInterval.value, active)
+        }
+    }
+
+    fun setThemeMode(isDark: Boolean?) {
+        viewModelScope.launch {
+            if (isDark == null) {
+                settingsRepository.useSystemTheme()
+            } else {
+                settingsRepository.setDarkMode(isDark)
+            }
+        }
+    }
+
+    fun setAccentColor(accentId: Int) {
+        viewModelScope.launch {
+            settingsRepository.saveAccentColor(accentId)
         }
     }
 
